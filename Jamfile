@@ -79,6 +79,7 @@ GAME_NAMES =
 	Mode
 	GL
 	Load
+	Flashlight
 	;
 
 LOCATE_TARGET = objs ; #put objects in 'objs' directory
