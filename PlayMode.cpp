@@ -1,5 +1,4 @@
 #include "PlayMode.hpp"
-#include "Flashlight.hpp"
 //for the GL_ERRORS() macro:
 #include "SDL_events.h"
 #include "gl_errors.hpp"
@@ -55,33 +54,7 @@ PlayMode::PlayMode() {
 
 	player_tile_pos = glm::vec2(map_width/2.0f, map_height/2.0f);
 	camera_pos = glm::vec2(map_width/2.0f, map_height/2.0f);
-	// mark all corners. note that corners on the outside are never checked.
-	for (size_t y = 1; y < map_height; y++) {
-		for (size_t x = 1; x < map_width; x++) {
-			
-			// check tile map surrounding the potential corner.
-			// the "== 1" is a placeholder here--if more tile types
-			// get added, this will become a function to check if a
-			// given tile id is a wall.
-			bool top_left = map_tiles[(y-1)*map_width+(x-1)] == 1;
-			bool top_rght = map_tiles[(y-1)*map_width+(x  )] == 1;
-			bool bot_left = map_tiles[(y  )*map_width+(x-1)] == 1;
-			bool bot_rght = map_tiles[(y  )*map_width+(x  )] == 1;
-			
-			// if the tile is part of a wall, continue.
-			if ((!top_left && !top_rght && !bot_left && !bot_rght) || // empty
-				(!top_left && !top_rght &&  bot_left &&  bot_rght) || // bottom
-				( top_left && !top_rght &&  bot_left && !bot_rght) || // left
-				( top_left &&  top_rght && !bot_left && !bot_rght) || // top
-				(!top_left &&  top_rght && !bot_left &&  bot_rght) || // right
-				( top_left &&  top_rght &&  bot_left &&  bot_rght)) { // full
-				continue;
-			}
-			
-			// otherwise, we're in a corner!
-			map_corners.emplace_back(x, y);
-		}
-	}
+	//
 	//TODO:
 	// you *must* use an asset pipeline of some sort to generate tiles.
 	// don't hardcode them like this!
@@ -390,10 +363,10 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	ppu.sprites[1].attributes = 7;
 
 
-	Flashlight flashlight;
-	glm::vec2 cast = flashlight.cast_ray((player_pos - glm::vec2(ppu.background_position))/8.0f, glm::normalize(mouse - player_pos), lower_left, map_tiles, map_width);
-	ppu.sprites[2].x = int32_t(cast.x * 8) + ppu.background_position.x;
-	ppu.sprites[2].y = int32_t(cast.y * 8) + ppu.background_position.y;
+	glm::vec2 cast = flashlight.cast_ray(player_pos - glm::vec2(ppu.background_position), glm::normalize(mouse - player_pos), lower_left, map_tiles, map_width);
+	flashlight.update_lightmap((player_pos - glm::vec2(ppu.background_position)), mouse, lower_left, map_tiles, map_width, map_height);
+	ppu.sprites[2].x = int32_t(cast.x) + ppu.background_position.x;
+	ppu.sprites[2].y = int32_t(cast.y) + ppu.background_position.y;
 	ppu.sprites[2].index = 2;
 	ppu.sprites[2].attributes = 1;
 

@@ -30,11 +30,15 @@ struct Flashlight {
 	Flashlight();
 	~Flashlight();
 
-	typedef std::array<uint8_t, 8> tilelight_t;
+	// opengl stuff
+	unsigned int fbo, tex, vbo, vao, program;
+	int otc_mat4;
 
-	static constexpr size_t lightmap_width = PPU466::BackgroundWidth/2 + 1;
-	static constexpr size_t lightmap_height = PPU466::BackgroundHeight/2 + 1;
-	std::array<tilelight_t, lightmap_height*lightmap_width> lightmap;
+	typedef std::pair<float, float> coord_t;
+
+	static constexpr size_t lightmap_width = (PPU466::BackgroundWidth/2 + 1) * 8;
+	static constexpr size_t lightmap_height = (PPU466::BackgroundHeight/2 + 1) * 8;
+	std::array<uint8_t, lightmap_height * lightmap_width> lightmap;
 
 	// the position in the tilemap where dynamic tiles begin to generate.
 	static constexpr size_t DYNAMIC_TILE_START = 128;
@@ -52,21 +56,21 @@ struct Flashlight {
 			const glm::vec2 &               mouse,
 			const glm::ivec2 &              lower_left,
 			const std::vector<uint8_t> &    map,
-			size_t                          map_width);
+			size_t                          map_width,
+			size_t                          map_height);
 
 	/**
 	 * Casts a ray, returns its intersection point. 
 	 * Inputs:
-	 * - from:       The point to cast the ray from. In pixel space
+	 * - player:     The point to cast the ray from. In pixel space
 	 * - angle:      The angle to cast the ray at, CCW from +x direction.
 	 * - lower_left: The lower_left tile in the map. Can be outside of map bounds.
 	 * - map:        The map.
 	 */
 	glm::vec2 cast_ray(
-			const glm::vec2 &               from,
+			const glm::vec2 &               player,
 			const glm::vec2 &               direction,
 			const glm::ivec2 &              lower_left,
 			const std::vector<uint8_t> &    map,
-			size_t                          map_width);	
-
+			size_t                          map_width);
 };
