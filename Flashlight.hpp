@@ -36,8 +36,11 @@ struct Flashlight {
 
 	typedef std::pair<float, float> coord_t;
 
-	static constexpr size_t lightmap_width = (PPU466::BackgroundWidth/2 + 1) * 8;
-	static constexpr size_t lightmap_height = (PPU466::BackgroundHeight/2 + 1) * 8;
+	enum : size_t {
+		lightmap_width = (PPU466::BackgroundWidth/2 + 1) * 8,
+		lightmap_height = (PPU466::BackgroundHeight/2 + 1) * 8
+	};
+
 	std::array<uint8_t, lightmap_height * lightmap_width> lightmap;
 
 	// the position in the tilemap where dynamic tiles begin to generate.
@@ -73,4 +76,21 @@ struct Flashlight {
 			const glm::ivec2 &              lower_left,
 			const std::vector<uint8_t> &    map,
 			size_t                          map_width);
+
+	/**
+	 * Takes in a map location and "grafts" the lightmap onto it,
+	 * removing any pixels obscured by darkness.
+	 * Inputs:
+	 * - lower_left: The lower_left tile in the map. Can be outside of map bounds.
+	 * - map:        The map.
+	 * - ppu:        The PPU466 to draw to.
+	 */
+	void graft(
+			const glm::ivec2 &              lower_left,
+			const std::vector<uint8_t> &    map,
+			size_t                          map_width,
+			size_t                          map_height,
+			const std::array<PPU466::Tile, 256> &tiles,
+			std::array<uint8_t, lightmap_width*lightmap_height/64> &newmap,
+			std::vector<PPU466::Tile> &dyntiles);
 };

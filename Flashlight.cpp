@@ -3,6 +3,7 @@
 #include "glm/fwd.hpp"
 #include <iostream>
 #include <queue>
+#include <unordered_map>
 #include <utility>
 #include "GL.hpp"
 #include "gl_compile_program.hpp"
@@ -95,6 +96,10 @@ Flashlight::~Flashlight() {
 	glDeleteProgram(program);
 };
 
+inline bool is_wall(uint8_t w) {
+	return w == 1;
+}
+
 glm::vec2 Flashlight::cast_ray(
 		const glm::vec2            &player,
 		const glm::vec2            &direction,
@@ -135,7 +140,7 @@ glm::vec2 Flashlight::cast_ray(
 
 		if (x < 0 || x >= (int)(lightmap_width /8)  ||
 			y < 0 || y >= (int)(lightmap_height/8) ||
-			map[(y + lower_left.y) * map_width + (x + lower_left.x)]
+			is_wall(map[(y + lower_left.y) * map_width + (x + lower_left.x)])
 		) {
 			t_max_y -= t_delta_y;
 			t_max_x -= t_delta_x;
@@ -188,197 +193,288 @@ void Flashlight::update_lightmap(
 		size_t map_width,
 		size_t map_height) {
 
-		constexpr float EPSILON = 0.0001;
-		const float cos_eps = glm::cos(EPSILON);
-		const float sin_eps = glm::sin(EPSILON);
+	constexpr float EPSILON = 0.0001;
+	const float cos_eps = glm::cos(EPSILON);
+	const float sin_eps = glm::sin(EPSILON);
 
-		// rotation matrix, +0.0001 rad
-		const glm::mat2x2 rot_eps_pos = glm::mat2x2(
-			cos_eps, sin_eps,
-			-sin_eps, cos_eps
-		);
+	// rotation matrix, +0.0001 rad
+	const glm::mat2x2 rot_eps_pos = glm::mat2x2(
+		cos_eps, sin_eps,
+		-sin_eps, cos_eps
+	);
 
-		// rotation matrix, -0.0001 rad
-		const glm::mat2x2 rot_eps_neg = glm::mat2x2(
-			cos_eps, -sin_eps,
-			sin_eps, cos_eps
-		);
+	// rotation matrix, -0.0001 rad
+	const glm::mat2x2 rot_eps_neg = glm::mat2x2(
+		cos_eps, -sin_eps,
+		sin_eps, cos_eps
+	);
 
-		(void) rot_eps_pos;
-		(void) rot_eps_neg;
+	(void) rot_eps_pos;
+	(void) rot_eps_neg;
 
-		const glm::vec2 player_to_mouse = glm::normalize(mouse - player);
-		const float flashlight_arc = 3.1415f / 6.0f;
-		
-		const glm::mat2x2 rot_arc = glm::mat2x2(
-				 glm::cos(flashlight_arc), glm::sin(flashlight_arc),
-				-glm::sin(flashlight_arc), glm::cos(flashlight_arc));
-
-		// note--this method of sorting vertices with a PQ breaks down
-		// if the flashlight arc is >pi/2!
-		const glm::mat2x2 rot_min_to_origin = 
-			rot_arc *
-			glm::mat2x2(
-				 player_to_mouse.x,-player_to_mouse.y,
-				 player_to_mouse.y, player_to_mouse.x);
-		
-		typedef std::pair<float, glm::vec2> pq_elem_t;
-		const auto pq_lt = [](pq_elem_t a, pq_elem_t b){return a.first > b.first;};
-		std::priority_queue<pq_elem_t, std::vector<pq_elem_t>, decltype(pq_lt)> pq(pq_lt);	
-
-		auto add_pq = [&pq, rot_min_to_origin](const glm::vec2 &elem) {
-			
-			const glm::vec2 trans_elem = rot_min_to_origin * elem;
-			float angle = glm::atan(trans_elem.y, trans_elem.x);
-
-			pq.emplace(angle, elem);
-		}; 
-
-		add_pq(glm::transpose(rot_arc) * player_to_mouse);
-		add_pq(rot_arc * player_to_mouse);
-
-		// lambda to index into the tilemap, dealing with OOB
-		// by treating them like walls
-		auto get_tilepos = [map, lower_left, map_width, map_height](int x_, int y_){
-			
-			if (x_ == 0 || x_ == (int)map_width) {
-				return (uint8_t)1;
-			} else if (y_ == 0 || y_ == (int)map_height) {
-				return (uint8_t)1;
-			}
-
-			x_ += lower_left.x;
-			y_ += lower_left.y;
-			
-			if (x_ < 0 || x_ >= (int)map_width) {
-				return (uint8_t)1;
-			}
-			else if (y_ < 0 || y_ >= (int)map_height) {
-				return (uint8_t)1;
-			}
-			else {
-				return map[y_ * map_width + x_];
-			}
-		};
-
-		// find corners
-		for (int y = 0; y <= (int)(lightmap_height/8); y++) {
-			for (int x = 0; x <= (int)(lightmap_width/8); x++) {
-
-				bool tl = get_tilepos(x-1, y  );
-				bool tr = get_tilepos(x  , y  );
-				bool bl = get_tilepos(x-1, y-1);
-				bool br = get_tilepos(x  , y-1);
-
-				bool is_corner = !(
-						(!tl && !tr && !bl && !br) ||
-						( tl &&  tr &&  bl &&  br) ||
-						(!tl && !tr &&  bl &&  br) ||
-						( tl &&  tr && !bl && !br) ||
-						( tl && !tr &&  bl && !br) ||
-						(!tl &&  tr && !bl &&  br)
-				);
-
-				glm::vec2 corner = glm::vec2(x, y) * 8.0f;
-				float thresh = glm::cos(flashlight_arc);
-				if (is_corner) {
-					// check if corner is in flashlight range
-					glm::vec2 player_to_corner = glm::normalize(corner - player);
-					if (glm::dot(player_to_corner, player_to_mouse) >= thresh) {
-						add_pq(player_to_corner);
-						add_pq(rot_eps_neg * player_to_corner);
-						add_pq(rot_eps_pos * player_to_corner);
-					}
-				}
- 
-			}
-		}
-
-		// generate points
-		std::vector<glm::vec2> verts;
-
-		verts.emplace_back(player);
-
-		while (pq.size() > 0) {
-			glm::vec2 dir = pq.top().second;
-			pq.pop();
-
-			verts.push_back(cast_ray(player, dir, lower_left, map, map_width));
-		}
-
-		// actually update lightmap with OpenGL
-
-		// from Jim McCann, PPU466.cpp
-		GLint old_viewport[4];
-		glGetIntegerv(GL_VIEWPORT, old_viewport);
-
-		// https://learnopengl.com/code_viewer_gh.php?code=src/4.advanced_opengl/5.1.framebuffers/framebuffers.cpp
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		glViewport(0, 0, lightmap_width, lightmap_height);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		// MOST OF THE FOLLOWING CODE IS TAKEN FROM PPU466.CPP
-		// ALL CREDIT TO JIM MCCANN :)
-
-		//upload vertex data:
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * verts.size(), verts.data(), GL_STREAM_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		
-
-		//set up the pipeline:
-		// set blending function for output fragments:
-		glEnable(GL_BLEND);
-		glBlendEquation(GL_FUNC_ADD);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		// set the shader programs:
-		glUseProgram(program);
-
-		// configure attribute streams:
-		glBindVertexArray(vao);
-
-		// set uniforms for shader programs:
-		{ //set matrix to transform [0,ScreenWidth]x[0,ScreenHeight] -> [-1,1]x[-1,1]:
-			//NOTE: glm uses column-major matrices:
-			glm::mat4 OBJECT_TO_CLIP = glm::mat4(
-				glm::vec4(2.0f / lightmap_width, 0.0f, 0.0f, 0.0f),
-				glm::vec4(0.0f, 2.0f / lightmap_height, 0.0f, 0.0f),
-				glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
-				glm::vec4(-1.0f,-1.0f, 0.0f, 1.0f)
-			);
-			glUniformMatrix4fv(otc_mat4, 1, GL_FALSE, glm::value_ptr(OBJECT_TO_CLIP));
-		}
-
-		//now that the pipeline is configured, trigger drawing of triangle strip:
-		glDrawArrays(GL_TRIANGLE_FAN, 0, GLsizei(verts.size()));
-
-		glBindVertexArray(0);
-		glUseProgram(0);
-
-		glDisable(GL_BLEND);
-			
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	const glm::vec2 player_to_mouse = glm::normalize(mouse - player);
+	const float flashlight_arc = 3.1415f / 6.0f;
 	
-		glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);	
+	const glm::mat2x2 rot_arc = glm::mat2x2(
+			 glm::cos(flashlight_arc), glm::sin(flashlight_arc),
+			-glm::sin(flashlight_arc), glm::cos(flashlight_arc));
 
-		for (size_t i = 0; i < lightmap.size(); i++) {
-			lightmap[i] = 200;
-		}
-		glBindTexture(GL_TEXTURE_2D, tex);
-		glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_BYTE, lightmap.data());
+	// note--this method of sorting vertices with a PQ breaks down
+	// if the flashlight arc is >pi/2!
+	const glm::mat2x2 rot_min_to_origin = 
+		rot_arc *
+		glm::mat2x2(
+			 player_to_mouse.x,-player_to_mouse.y,
+			 player_to_mouse.y, player_to_mouse.x);
+	
+	typedef std::pair<float, glm::vec2> pq_elem_t;
+	const auto pq_lt = [](pq_elem_t a, pq_elem_t b){return a.first > b.first;};
+	std::priority_queue<pq_elem_t, std::vector<pq_elem_t>, decltype(pq_lt)> pq(pq_lt);	
+
+	auto add_pq = [&pq, rot_min_to_origin](const glm::vec2 &elem) {
 		
-		for (size_t y = 0; y < lightmap_height; y+=8) {
-			for (size_t x = 0; x < lightmap_width; x+=8) {
-				std::cout << (lightmap[y * lightmap_width + x] > 0 ? "1" : "0");
+		const glm::vec2 trans_elem = rot_min_to_origin * elem;
+		float angle = glm::atan(trans_elem.y, trans_elem.x);
+
+		pq.emplace(angle, elem);
+	}; 
+
+	add_pq(glm::transpose(rot_arc) * player_to_mouse);
+	add_pq(rot_arc * player_to_mouse);
+
+	// lambda to index into the tilemap, dealing with OOB
+	// by treating them like walls
+	auto get_tilepos = [map, lower_left, map_width, map_height](int x_, int y_){
+		
+		if (x_ < 0 || x_ > (int)map_width) {
+			return true;
+		} else if (y_ < 0 || y_ > (int)map_height) {
+			return true;
+		}
+
+		x_ += lower_left.x;
+		y_ += lower_left.y;
+		
+		if (x_ < 0 || x_ >= (int)map_width) {
+			return true;
+		}
+		else if (y_ < 0 || y_ >= (int)map_height) {
+			return true;
+		}
+		else {
+			return is_wall(map[y_ * map_width + x_]);
+		}
+	};
+
+	// find corners
+	for (int y = 0; y <= (int)(lightmap_height/8); y++) {
+		for (int x = 0; x <= (int)(lightmap_width/8); x++) {
+
+			bool tl = get_tilepos(x-1, y  );
+			bool tr = get_tilepos(x  , y  );
+			bool bl = get_tilepos(x-1, y-1);
+			bool br = get_tilepos(x  , y-1);
+
+			bool is_corner = !(
+					(!tl && !tr && !bl && !br) ||
+					( tl &&  tr &&  bl &&  br) ||
+					(!tl && !tr &&  bl &&  br) ||
+					( tl &&  tr && !bl && !br) ||
+					( tl && !tr &&  bl && !br) ||
+					(!tl &&  tr && !bl &&  br)
+			);
+
+			glm::vec2 corner = glm::vec2(x, y) * 8.0f;
+			float thresh = glm::cos(flashlight_arc);
+			if (is_corner) {
+				// check if corner is in flashlight range
+				glm::vec2 player_to_corner = glm::normalize(corner - player);
+				if (glm::dot(player_to_corner, player_to_mouse) >= thresh) {
+					add_pq(player_to_corner);
+					add_pq(rot_eps_neg * player_to_corner);
+					add_pq(rot_eps_pos * player_to_corner);
+				}
 			}
-			std::cout << std::endl;
-		}
-		std::cout << "======" << std::endl;
-		
-		glBindTexture(GL_TEXTURE_2D, 0);
 
-		GL_ERRORS();	
+		}
+	}
+
+	// generate points
+	std::vector<glm::vec2> verts;
+
+	verts.emplace_back(player);
+
+	while (pq.size() > 0) {
+		glm::vec2 dir = pq.top().second;
+		pq.pop();
+
+		verts.push_back(cast_ray(player, dir, lower_left, map, map_width));
+	}
+
+	// actually update lightmap with OpenGL
+
+	// from Jim McCann, PPU466.cpp
+	GLint old_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+	// https://learnopengl.com/code_viewer_gh.php?code=src/4.advanced_opengl/5.1.framebuffers/framebuffers.cpp
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glViewport(0, 0, lightmap_width, lightmap_height);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// MOST OF THE FOLLOWING CODE IS TAKEN FROM PPU466.CPP
+	// ALL CREDIT TO JIM MCCANN :)
+
+	//upload vertex data:
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * verts.size(), verts.data(), GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	
+
+	//set up the pipeline:
+	// set blending function for output fragments:
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// set the shader programs:
+	glUseProgram(program);
+
+	// configure attribute streams:
+	glBindVertexArray(vao);
+
+	// set uniforms for shader programs:
+	{ //set matrix to transform [0,ScreenWidth]x[0,ScreenHeight] -> [-1,1]x[-1,1]:
+		//NOTE: glm uses column-major matrices:
+		glm::mat4 OBJECT_TO_CLIP = glm::mat4(
+			glm::vec4(2.0f / lightmap_width, 0.0f, 0.0f, 0.0f),
+			glm::vec4(0.0f, 2.0f / lightmap_height, 0.0f, 0.0f),
+			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
+			glm::vec4(-1.0f,-1.0f, 0.0f, 1.0f)
+		);
+		glUniformMatrix4fv(otc_mat4, 1, GL_FALSE, glm::value_ptr(OBJECT_TO_CLIP));
+	}
+
+	//now that the pipeline is configured, trigger drawing of triangle strip:
+	glDrawArrays(GL_TRIANGLE_FAN, 0, GLsizei(verts.size()));
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+
+	glDisable(GL_BLEND);
+		
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);	
+
+	for (size_t i = 0; i < lightmap.size(); i++) {
+		lightmap[i] = 200;
+	}
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_BYTE, lightmap.data());
+	
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	GL_ERRORS();	
 
 }
+
+void Flashlight::graft(
+		const glm::ivec2 &              lower_left,
+		const std::vector<uint8_t> &    map,
+		size_t                          map_width,
+		size_t                          map_height,
+		const std::array<PPU466::Tile, 256> &tiles,
+		std::array<uint8_t, lightmap_width*lightmap_height/64> &newmap,
+		std::vector<PPU466::Tile> &     dyntiles) {
+
+	dyntiles.clear();
+
+	// https://www.geeksforgeeks.org/how-to-create-an-unordered_map-of-pairs-in-c/
+	auto hash_tile = [](PPU466::Tile t){
+		size_t hash = 0;
+		for (size_t i = 0; i < 8; i++) {
+			hash ^= std::hash<uint8_t>{}(t.bit0[i]);
+			hash ^= std::hash<uint8_t>{}(t.bit1[i]);
+		}
+		return hash;
+	};
+
+	auto tile_equal = [](PPU466::Tile a, PPU466::Tile b){
+		return (a.bit0 == b.bit0) && (a.bit1 == b.bit1);
+	};
+
+	// hash table mapping tiles to indices
+	std::unordered_map<PPU466::Tile, uint8_t, decltype(hash_tile), decltype(tile_equal)> newtiles(20, hash_tile, tile_equal);
+
+	for (size_t y = 0; y < lightmap_height/8; y++) {
+		for (size_t x = 0; x < lightmap_width/8; x++) {
+			size_t newmap_index = y * lightmap_width/8 + x;
+
+			int x_tilepos = lower_left.x + (int)x;
+			int y_tilepos = lower_left.y + (int)y;
+
+			if (x_tilepos < 0 || x_tilepos >= (int)map_width) {
+				newmap[newmap_index] = (uint8_t)0;
+				continue;
+			} else if (y_tilepos < 0 || y_tilepos >= (int)map_height) {
+				newmap[newmap_index] = (uint8_t)0;
+				continue;
+			}
+
+			uint8_t tile_index = map[y_tilepos * map_width + x_tilepos];
+			PPU466::Tile tile = tiles[tile_index];
+
+			bool is_all_ones = true;
+			bool is_all_zeros = true;
+			for (size_t yy = 0; yy < 8; yy++) {
+				uint8_t light_row = 0;
+				for (int xx = 7; xx >= 0; xx--) {
+					light_row <<= 1;
+					if (lightmap[(y * 8 + yy) * lightmap_width + (x * 8 + xx)]) {
+						light_row += 1;
+						is_all_zeros = false;
+					} else {
+						is_all_ones = false;
+					}
+				}
+				tile.bit0[yy] &= light_row;
+				tile.bit1[yy] &= light_row;
+			}
+
+			if (is_all_ones) {
+				// tilemap all ones, just use static tile
+				newmap[newmap_index] = tile_index;
+			} else if (is_all_zeros) {
+				if (tile_index == 1) {
+					newmap[newmap_index] = (uint8_t)1;
+					continue;
+				}
+				// tilemap all zeros, just use blank tile
+				newmap[newmap_index] = (uint8_t)0;
+			} else {
+				// see if we've already constructed this tile
+				auto search = newtiles.find(tile);
+				if (search == newtiles.end()) {
+					// we haven't, add it
+					if (dyntiles.size() >= 128) {
+						std::cout << "Oh no, tile overflow!" << std::endl;
+					}
+					newtiles[tile] = dyntiles.size() + DYNAMIC_TILE_START;
+					newmap[newmap_index] = dyntiles.size() + DYNAMIC_TILE_START;
+					dyntiles.push_back(tile);
+				} else {
+					// we have, reuse that index
+					newmap[newmap_index] = search->second;
+				}
+			}
+
+		}
+	}
+
+}
+
+
+
+
