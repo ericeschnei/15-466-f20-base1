@@ -1,9 +1,9 @@
-# Towards the Light
+# Through the Catacombs
 
 Author: Eric Schneider
 
 Design: This game was meant to test the limits of the PPU466. It uses both dynamic and static tile generation
-to create a game about adventure, loss, and light.
+to create a game that simulates 3D perspective while still only using the 2D spritemap.
 
 Screen Shot:
 
@@ -11,34 +11,26 @@ Screen Shot:
 
 How Your Asset Pipeline Works:
 
-The game has three different kinds of source files:
-- Sprites
-- Text
-- Map
+The game has two different kinds of source files, which both ship alongside it.
+The first is a tilemap, which is simply loaded statically into tile memory in
+row-major order, starting from the bottom left. Transparent pixels correspond to
+palette index zero, black 1, grey 2, and white 3.
 
-Sprites are loaded using the sprites.png file and its corresponding sprites.txt file.  
-To access a sprite, you simply look up its entry in the .txt, then you get an index.
+The map itself is also shipped as a PNG, and it is much simpler: black is a wall, and white is open space.
 
-Due to the technical constraints of dynamic rendering, I decided to limit my game to
-only a few colors, so almost everything uses palette 0, which is loaded through
-palette.txt.
-
-Text is programmed using a very simple syntax:
-```
-(128, 256)
-This will print a line when the coordinate above is stepped on,
-5
-wait five seconds, then finish.
-```
+Indexing into the tilemap is done using a SpriteIndices class which holds the positions of all
+the tiles by name. It's the same strategy Minecraft used to employ, and look how they turned out! :)
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+You are a guy running around a maze, trying to pick up as many emeralds as you can
+in 60 seconds. Arrow keys to move. Your score is displayed in the top right,
+and your time remaining is shown in the top left.
 
 Sources: 
 
-- Font inspired by [Christian Munk's 7:12 Serif Font](https://www.1001fonts.com/7-12-serif-font.html).
-- Some assets modified from the [Kenney 1-bit pack](https://www.kenney.nl/assets/bit-pack).
+- Character is a modified version of a character from the [Kenney RPG Urban Pack](https://www.kenney.nl/assets/rpg-urban-pack)
+- Further inspiration for sprites was taken from the [Kenney 1-Bit Pack](https://www.kenney.nl/assets/bit-pack)
 
 This game was built with [NEST](NEST.md).
 
