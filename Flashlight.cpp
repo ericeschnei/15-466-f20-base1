@@ -114,8 +114,8 @@ glm::vec2 Flashlight::cast_ray(
 	int x = (int)glm::floor(from.x);
 	int y = (int)glm::floor(from.y);
 
-	int step_x = glm::sign(direction.x);
-	int step_y = glm::sign(direction.y);
+	int step_x = (int)glm::sign(direction.x);
+	int step_y = (int)glm::sign(direction.y);
 
 	double t_delta_x = 1.0f/glm::abs(direction.x);
 	double t_delta_y = 1.0f/glm::abs(direction.y);
@@ -193,13 +193,13 @@ void Flashlight::update_lightmap(
 		size_t map_height) {
 
 	// really, TRULY awful fix for a stupid bug.
-	if (glm::fract(player.x) >= 0.99) player.x -= 0.05;
-	if (glm::fract(player.y) >= 0.99) player.y -= 0.05;
-	if (glm::fract(player.x) <= 0.01) player.x += 0.05;
-	if (glm::fract(player.y) <= 0.01) player.y += 0.05;
+	if (glm::fract(player.x) >= 0.99f) player.x -= 0.05f;
+	if (glm::fract(player.y) >= 0.99f) player.y -= 0.05f;
+	if (glm::fract(player.x) <= 0.01f) player.x += 0.05f;
+	if (glm::fract(player.y) <= 0.01f) player.y += 0.05f;
 
 
-	constexpr float EPSILON = 0.001;
+	constexpr float EPSILON = 0.001f;
 	const float cos_eps = glm::cos(EPSILON);
 	const float sin_eps = glm::sin(EPSILON);
 
@@ -451,8 +451,8 @@ void Flashlight::graft(
 					if (dyntiles.size() >= 128) {
 						std::cout << "Oh no, tile overflow!" << std::endl;
 					}
-					newtiles[tile] = dyntiles.size() + DYNAMIC_TILE_START;
-					newmap[newmap_index] = dyntiles.size() + DYNAMIC_TILE_START;
+					newtiles[tile] = (uint8_t)(dyntiles.size() + DYNAMIC_TILE_START);
+					newmap[newmap_index] = (uint8_t)(dyntiles.size() + DYNAMIC_TILE_START);
 					dyntiles.push_back(tile);
 				} else {
 					// we have, reuse that index
