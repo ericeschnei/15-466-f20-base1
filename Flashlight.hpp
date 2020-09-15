@@ -55,7 +55,7 @@ struct Flashlight {
 	 * - map:        The map.
 	 */
 	void update_lightmap(
-			const glm::vec2 &               player,
+			glm::vec2                       player,
 			const glm::vec2 &               mouse,
 			const glm::ivec2 &              lower_left,
 			const std::vector<uint8_t> &    map,

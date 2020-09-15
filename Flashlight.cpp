@@ -117,17 +117,17 @@ glm::vec2 Flashlight::cast_ray(
 	int step_x = glm::sign(direction.x);
 	int step_y = glm::sign(direction.y);
 
-	float t_delta_x = 1.0f/glm::abs(direction.x);
-	float t_delta_y = 1.0f/glm::abs(direction.y);
+	double t_delta_x = 1.0f/glm::abs(direction.x);
+	double t_delta_y = 1.0f/glm::abs(direction.y);
 
-	float t_max_x;
+	double t_max_x;
 	if (step_x < 0) {
 		t_max_x = glm::fract(glm::abs(from.x)) * t_delta_x;
 	} else {
 		t_max_x = (1.0f - glm::fract(glm::abs(from.x))) * t_delta_x;
 	}
 
-	float t_max_y;
+	double t_max_y;
 	if (step_y < 0) {
 		t_max_y = glm::fract(glm::abs(from.y)) * t_delta_y;
 	} else {
@@ -145,7 +145,7 @@ glm::vec2 Flashlight::cast_ray(
 			t_max_y -= t_delta_y;
 			t_max_x -= t_delta_x;
 			
-			glm::vec2 ret = from + direction * (last_incremented_x ? t_max_x : t_max_y);
+			glm::vec2 ret = from + direction * (float)(last_incremented_x ? t_max_x : t_max_y);
 			if (last_incremented_x) {
 				ret.x = glm::round(ret.x);
 			} else {
@@ -186,14 +186,21 @@ glm::vec2 Flashlight::cast_ray(
 }
 
 void Flashlight::update_lightmap(
-		const glm::vec2 &player,
+		glm::vec2 player,
 		const glm::vec2 &mouse,
 		const glm::ivec2 &lower_left,
 		const std::vector<uint8_t> &map,
 		size_t map_width,
 		size_t map_height) {
 
-	constexpr float EPSILON = 0.0001;
+	// really, TRULY awful fix for a stupid bug.
+	if (glm::fract(player.x) >= 0.99) player.x -= 0.05;
+	if (glm::fract(player.y) >= 0.99) player.y -= 0.05;
+	if (glm::fract(player.x) <= 0.01) player.x += 0.05;
+	if (glm::fract(player.y) <= 0.01) player.y += 0.05;
+
+
+	constexpr float EPSILON = 0.001;
 	const float cos_eps = glm::cos(EPSILON);
 	const float sin_eps = glm::sin(EPSILON);
 
@@ -228,7 +235,13 @@ void Flashlight::update_lightmap(
 			 player_to_mouse.y, player_to_mouse.x);
 	
 	typedef std::pair<float, glm::vec2> pq_elem_t;
-	const auto pq_lt = [](pq_elem_t a, pq_elem_t b){return a.first > b.first;};
+	const auto pq_lt = [](pq_elem_t a, pq_elem_t b){
+		if (a.first == b.first) {
+			return glm::length(a.second) > glm::length(b.second);
+		}
+		return a.first > b.first;
+	};
+	
 	std::priority_queue<pq_elem_t, std::vector<pq_elem_t>, decltype(pq_lt)> pq(pq_lt);	
 
 	auto add_pq = [&pq, rot_min_to_origin](const glm::vec2 &elem) {
@@ -304,13 +317,15 @@ void Flashlight::update_lightmap(
 
 	verts.emplace_back(player);
 
+	std::cout << "P: " << verts.back().x << ", " << verts.back().y << std::endl;
 	while (pq.size() > 0) {
 		glm::vec2 dir = pq.top().second;
 		pq.pop();
 
 		verts.push_back(cast_ray(player, dir, lower_left, map, map_width));
+		std::cout << "V: " << verts.back().x << ", " << verts.back().y << std::endl;
 	}
-
+	std::cout << "M: " << mouse.x << ", " << mouse.y << std::endl;
 	// actually update lightmap with OpenGL
 
 	// from Jim McCann, PPU466.cpp
@@ -447,7 +462,7 @@ void Flashlight::graft(
 				// tilemap all ones, just use static tile
 				newmap[newmap_index] = tile_index;
 			} else if (is_all_zeros) {
-				if (tile_index == 1) {
+				if (tile_index == 100) {
 					newmap[newmap_index] = (uint8_t)1;
 					continue;
 				}
