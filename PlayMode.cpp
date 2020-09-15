@@ -428,9 +428,9 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		ppu.tile_table[64 + i] = t;
 
 		ppu.sprites[i].attributes = 1;
-		ppu.sprites[i].index = 64 + i;
-		ppu.sprites[i].x = coin_pos.x;
-		ppu.sprites[i].y = coin_pos.y;
+		ppu.sprites[i].index = (uint8_t)(64 + i);
+		ppu.sprites[i].x = (uint8_t)(coin_pos.x);
+		ppu.sprites[i].y = (uint8_t)(coin_pos.y);
 	}
 
 	// timer
