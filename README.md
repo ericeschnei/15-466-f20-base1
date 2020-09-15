@@ -1,8 +1,9 @@
-# (TODO: your game's title)
+# Towards the Light
 
-Author: (TODO: your name)
+Author: Eric Schneider
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: This game was meant to test the limits of the PPU466. It uses both dynamic and static tile generation
+to create a game about adventure, loss, and light.
 
 Screen Shot:
 
@@ -10,13 +11,34 @@ Screen Shot:
 
 How Your Asset Pipeline Works:
 
-(TODO: describe the steps in your asset pipeline, from source files to tiles/backgrounds/whatever you upload to the PPU466.)
+The game has three different kinds of source files:
+- Sprites
+- Text
+- Map
+
+Sprites are loaded using the sprites.png file and its corresponding sprites.txt file.  
+To access a sprite, you simply look up its entry in the .txt, then you get an index.
+
+Due to the technical constraints of dynamic rendering, I decided to limit my game to
+only a few colors, so almost everything uses palette 0, which is loaded through
+palette.txt.
+
+Text is programmed using a very simple syntax:
+```
+(128, 256)
+This will print a line when the coordinate above is stepped on,
+5
+wait five seconds, then finish.
+```
 
 How To Play:
 
 (TODO: describe the controls and (if needed) goals/strategy.)
 
-Sources: (TODO: list a source URL for any assets you did not create yourself. Make sure you have a license for the asset.)
+Sources: 
+
+- Font inspired by [Christian Munk's 7:12 Serif Font](https://www.1001fonts.com/7-12-serif-font.html).
+- Some assets modified from the [Kenney 1-bit pack](https://www.kenney.nl/assets/bit-pack).
 
 This game was built with [NEST](NEST.md).
 

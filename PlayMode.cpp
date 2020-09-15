@@ -245,7 +245,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 
-	constexpr float PlayerSpeed = 3.75f;
+	constexpr float PlayerSpeed = 6.0f;
 	if (left.pressed) player_tile_pos.x -= PlayerSpeed * elapsed;
 	if (right.pressed) player_tile_pos.x += PlayerSpeed * elapsed;
 	if (down.pressed) player_tile_pos.y -= PlayerSpeed * elapsed;
@@ -257,7 +257,7 @@ void PlayMode::update(float elapsed) {
 	up.downs = 0;
 	down.downs = 0;
 
-	glm::vec2 camera_dead_radius = glm::vec2(3.0f, 3.0f);
+	glm::vec2 camera_dead_radius = glm::vec2(1.0f, 1.0f);
 
 	if (player_tile_pos.x - camera_pos.x > camera_dead_radius.x) {
 		camera_pos.x = player_tile_pos.x - camera_dead_radius.x;
