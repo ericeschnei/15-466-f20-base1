@@ -80,6 +80,7 @@ GAME_NAMES =
 	GL
 	Load
 	Flashlight
+	data_path
 	;
 
 LOCATE_TARGET = objs ; #put objects in 'objs' directory

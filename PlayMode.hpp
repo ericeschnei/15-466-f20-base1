@@ -34,6 +34,13 @@ struct PlayMode : Mode {
 	glm::vec2   player_tile_pos;
 	glm::vec2   camera_pos;
 
+	static const int LEFT = 0;
+	static const int RIGHT = 1;
+	static const int UP = 2;
+	static const int DOWN = 3;
+
+	int last_pressed = UP;
+
 	// convert from screen space (top-left origin)
 	// to ppu space (bottom-left origin)
 	glm::mat3x2 screen_to_ppu;

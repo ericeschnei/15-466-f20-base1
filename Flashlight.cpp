@@ -97,7 +97,7 @@ Flashlight::~Flashlight() {
 };
 
 inline bool is_wall(uint8_t w) {
-	return w == 1;
+	return w == 7;
 }
 
 glm::vec2 Flashlight::cast_ray(
@@ -219,21 +219,7 @@ void Flashlight::update_lightmap(
 	(void) rot_eps_pos;
 	(void) rot_eps_neg;
 
-	const glm::vec2 player_to_mouse = glm::normalize(mouse - player);
-	const float flashlight_arc = 3.1415f / 6.0f;
-	
-	const glm::mat2x2 rot_arc = glm::mat2x2(
-			 glm::cos(flashlight_arc), glm::sin(flashlight_arc),
-			-glm::sin(flashlight_arc), glm::cos(flashlight_arc));
 
-	// note--this method of sorting vertices with a PQ breaks down
-	// if the flashlight arc is >pi/2!
-	const glm::mat2x2 rot_min_to_origin = 
-		rot_arc *
-		glm::mat2x2(
-			 player_to_mouse.x,-player_to_mouse.y,
-			 player_to_mouse.y, player_to_mouse.x);
-	
 	typedef std::pair<float, glm::vec2> pq_elem_t;
 	const auto pq_lt = [](pq_elem_t a, pq_elem_t b){
 		if (a.first == b.first) {
@@ -244,24 +230,21 @@ void Flashlight::update_lightmap(
 	
 	std::priority_queue<pq_elem_t, std::vector<pq_elem_t>, decltype(pq_lt)> pq(pq_lt);	
 
-	auto add_pq = [&pq, rot_min_to_origin](const glm::vec2 &elem) {
+	auto add_pq = [&pq](const glm::vec2 &elem) {
 		
-		const glm::vec2 trans_elem = rot_min_to_origin * elem;
-		float angle = glm::atan(trans_elem.y, trans_elem.x);
+		float angle = glm::atan(elem.y, elem.x);
 
 		pq.emplace(angle, elem);
 	}; 
 
-	add_pq(glm::transpose(rot_arc) * player_to_mouse);
-	add_pq(rot_arc * player_to_mouse);
 
 	// lambda to index into the tilemap, dealing with OOB
 	// by treating them like walls
 	auto get_tilepos = [map, lower_left, map_width, map_height](int x_, int y_){
 		
-		if (x_ < 0 || x_ > (int)map_width) {
+		if (x_ < 0 || x_ >= (int)lightmap_width/8) {
 			return true;
-		} else if (y_ < 0 || y_ > (int)map_height) {
+		} else if (y_ < 0 || y_ >= (int)lightmap_height/8) {
 			return true;
 		}
 
@@ -298,15 +281,11 @@ void Flashlight::update_lightmap(
 			);
 
 			glm::vec2 corner = glm::vec2(x, y) * 8.0f;
-			float thresh = glm::cos(flashlight_arc);
 			if (is_corner) {
-				// check if corner is in flashlight range
 				glm::vec2 player_to_corner = glm::normalize(corner - player);
-				if (glm::dot(player_to_corner, player_to_mouse) >= thresh) {
-					add_pq(player_to_corner);
-					add_pq(rot_eps_neg * player_to_corner);
-					add_pq(rot_eps_pos * player_to_corner);
-				}
+				add_pq(player_to_corner);
+				add_pq(rot_eps_neg * player_to_corner);
+				add_pq(rot_eps_pos * player_to_corner);
 			}
 
 		}
@@ -317,15 +296,16 @@ void Flashlight::update_lightmap(
 
 	verts.emplace_back(player);
 
-	std::cout << "P: " << verts.back().x << ", " << verts.back().y << std::endl;
+	glm::vec2 end = pq.top().second;
+
 	while (pq.size() > 0) {
 		glm::vec2 dir = pq.top().second;
 		pq.pop();
 
 		verts.push_back(cast_ray(player, dir, lower_left, map, map_width));
-		std::cout << "V: " << verts.back().x << ", " << verts.back().y << std::endl;
 	}
-	std::cout << "M: " << mouse.x << ", " << mouse.y << std::endl;
+
+	verts.push_back(cast_ray(player, end, lower_left, map, map_width));
 	// actually update lightmap with OpenGL
 
 	// from Jim McCann, PPU466.cpp
@@ -431,10 +411,10 @@ void Flashlight::graft(
 			int y_tilepos = lower_left.y + (int)y;
 
 			if (x_tilepos < 0 || x_tilepos >= (int)map_width) {
-				newmap[newmap_index] = (uint8_t)0;
+				newmap[newmap_index] = (uint8_t)7;
 				continue;
 			} else if (y_tilepos < 0 || y_tilepos >= (int)map_height) {
-				newmap[newmap_index] = (uint8_t)0;
+				newmap[newmap_index] = (uint8_t)7;
 				continue;
 			}
 
@@ -462,12 +442,8 @@ void Flashlight::graft(
 				// tilemap all ones, just use static tile
 				newmap[newmap_index] = tile_index;
 			} else if (is_all_zeros) {
-				if (tile_index == 100) {
-					newmap[newmap_index] = (uint8_t)1;
-					continue;
-				}
 				// tilemap all zeros, just use blank tile
-				newmap[newmap_index] = (uint8_t)0;
+				newmap[newmap_index] = (uint8_t)7;
 			} else {
 				// see if we've already constructed this tile
 				auto search = newtiles.find(tile);
