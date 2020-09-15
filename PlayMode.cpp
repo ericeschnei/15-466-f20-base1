@@ -89,9 +89,9 @@ PlayMode::PlayMode() {
 	//makes the outside of tiles 0-16 solid:
 	ppu.palette_table[0] = {
 		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x8c, 0x5b, 0x2a, 0xff),
-		glm::u8vec4(0x8c, 0x67, 0x43, 0xff),
-		glm::u8vec4(0xb8, 0x99, 0x65, 0xff),
+		glm::u8vec4(0x88, 0x88, 0x99, 0xff),
+		glm::u8vec4(0xaa, 0xaa, 0xbb, 0xff),
+		glm::u8vec4(0xcc, 0xcc, 0xdd, 0xff),
 	};
 
 	//makes the center of tiles 0-16 solid:
@@ -103,8 +103,8 @@ PlayMode::PlayMode() {
 	};
 
 	ppu.palette_table[2] = {
-		glm::u8vec4(0x00, 0x80, 0x00, 0xff),
-		glm::u8vec4(0x00, 0xff, 0x00, 0xff),
+		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+		glm::u8vec4(0xdd, 0xdd, 0xff, 0xff),
 		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
 		glm::u8vec4(0x00, 0x00, 0x00, 0x00)
 	};
@@ -192,9 +192,11 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 
-	if (game_timer > 0) {
-		frame_timer += elapsed;
+	if (game_timer == 0) {
+		return;
 	}
+
+	frame_timer += elapsed;
 	if (frame_timer >= (4.0f * time_per_frame)) frame_timer -= 4.0f * time_per_frame;
 
 	game_timer = glm::max(0.0f, game_timer - elapsed);
@@ -273,6 +275,15 @@ void PlayMode::update(float elapsed) {
 		camera_pos.y = player_tile_pos.y - camera_dead_radius.y;
 	} else if (player_tile_pos.y - camera_pos.y < -camera_dead_radius.y) {
 		camera_pos.y = player_tile_pos.y + camera_dead_radius.y;
+	}
+
+	// collect emeralds
+	for (size_t i = 0; i < coins.size(); i++) {
+		if (glm::distance(glm::vec2(coins[i]), player_tile_pos) < 1.4) {
+			score++;
+			coins[i] = glm::ivec2(-1000, -1000);
+		}
+
 	}
 
 
@@ -422,6 +433,25 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		ppu.sprites[i].y = coin_pos.y;
 	}
 
+	// timer
+	ppu.sprites[44].attributes = 2;
+	ppu.sprites[44].index = SpriteIndices::numerals[((int)game_timer) / 10];
+	ppu.sprites[44].x = 0;
+	ppu.sprites[44].y = PPU466::ScreenHeight - 8;
+	ppu.sprites[45].attributes = 2;
+	ppu.sprites[45].index = SpriteIndices::numerals[((int)game_timer) % 10];
+	ppu.sprites[45].x = 8;
+	ppu.sprites[45].y = PPU466::ScreenHeight - 8;
+
+	// scoreboard
+	ppu.sprites[46].attributes = 2;
+	ppu.sprites[46].index = SpriteIndices::numerals[score / 10];
+	ppu.sprites[46].x = PPU466::ScreenWidth - 16;
+	ppu.sprites[46].y = PPU466::ScreenHeight - 8;
+	ppu.sprites[47].attributes = 2;
+	ppu.sprites[47].index = SpriteIndices::numerals[score % 10];
+	ppu.sprites[47].x = PPU466::ScreenWidth - 8;
+	ppu.sprites[47].y = PPU466::ScreenHeight - 8;
 
 	//--- actually draw ---
 	ppu.draw(drawable_size);
