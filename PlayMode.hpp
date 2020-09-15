@@ -18,6 +18,7 @@ struct PlayMode : Mode {
 	virtual void update(float elapsed) override;
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
+	void draw_player();
 	//----- game state -----
 
 
@@ -40,6 +41,13 @@ struct PlayMode : Mode {
 	static const int DOWN = 3;
 
 	int last_pressed = UP;
+	int score = 0;
+
+	std::vector<glm::ivec2> coins;
+
+	float frame_timer;
+	float game_timer = 60.0f;
+	static constexpr float time_per_frame = 0.1f;
 
 	// convert from screen space (top-left origin)
 	// to ppu space (bottom-left origin)

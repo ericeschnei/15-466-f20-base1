@@ -187,7 +187,6 @@ glm::vec2 Flashlight::cast_ray(
 
 void Flashlight::update_lightmap(
 		glm::vec2 player,
-		const glm::vec2 &mouse,
 		const glm::ivec2 &lower_left,
 		const std::vector<uint8_t> &map,
 		size_t map_width,

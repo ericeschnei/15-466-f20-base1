@@ -23,8 +23,6 @@ inline void load_map(std::vector<uint8_t> &map_tiles, size_t &map_width, size_t 
 	map_width = size.x;
 	map_height = size.y;
 
-	static std::mt19937 mt;
-
 	for (size_t y = 0; y < size.y; y++) {
 		for (size_t x = 0; x < size.x; x++) {
 			glm::u8vec4 d = data[y * size.x + x];
@@ -37,6 +35,7 @@ inline void load_map(std::vector<uint8_t> &map_tiles, size_t &map_width, size_t 
 
 		}
 	}
+
 }
 
 inline void load_tiles(PPU466 &ppu) {
@@ -97,10 +96,10 @@ PlayMode::PlayMode() {
 
 	//makes the center of tiles 0-16 solid:
 	ppu.palette_table[1] = {
-		glm::u8vec4(0x80, 0x00, 0x00, 0xff),
-		glm::u8vec4(0xff, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+		glm::u8vec4(0x0d, 0xa3, 0x2e, 0xff),
+		glm::u8vec4(0x2d, 0xba, 0x2b, 0xff),
+		glm::u8vec4(0x83, 0xf0, 0x5b, 0xff),
 	};
 
 	ppu.palette_table[2] = {
@@ -120,9 +119,9 @@ PlayMode::PlayMode() {
 	//used for the player:
 	ppu.palette_table[7] = {
 		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0xff, 0xff, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+		glm::u8vec4(0x20, 0x00, 0x80, 0xff),
+		glm::u8vec4(0xbb, 0x55, 0x00, 0xff),
+		glm::u8vec4(0xf2, 0xd7, 0xa0, 0xff),
 	};
 
 	//used for the misc other sprites:
@@ -133,12 +132,25 @@ PlayMode::PlayMode() {
 		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
 	};
 
+	static std::mt19937 mt;
+
+	for (int i = 0; i < 40; i++) {
+		coins.emplace_back(mt() % map_width, mt() % map_height);
+		while (map_tiles[coins.back().y * map_width + coins.back().x]) {
+			coins.back() = glm::ivec2(mt() % map_width, mt() % map_height);
+		}
+	}
+
 }
 
 PlayMode::~PlayMode() {
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
+
+	if (game_timer == 0.0f) {
+		return false;
+	}
 
 	if (evt.type == SDL_KEYDOWN) {
 		if (evt.key.keysym.sym == SDLK_LEFT) {
@@ -179,6 +191,13 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 
 void PlayMode::update(float elapsed) {
+
+	if (game_timer > 0) {
+		frame_timer += elapsed;
+	}
+	if (frame_timer >= (4.0f * time_per_frame)) frame_timer -= 4.0f * time_per_frame;
+
+	game_timer = glm::max(0.0f, game_timer - elapsed);
 
 	auto is_wall = [this](const glm::vec2 &v){
 		return this->map_tiles[((uint32_t)v.y) * this->map_width + ((uint32_t)v.x)] == 7;
@@ -259,6 +278,34 @@ void PlayMode::update(float elapsed) {
 
 }
 
+
+void PlayMode::draw_player() {
+
+	int frame = (int)(frame_timer / time_per_frame);
+	int pose;
+	if (!(left.pressed || right.pressed || up.pressed || down.pressed)) {
+		pose = 0;
+	} else {
+		pose = (frame == 0 || frame == 2) ? 0 : (frame == 1 ? 1 : 2);
+	}
+
+	//player sprite:
+	glm::vec2 player_pos = glm::vec2(
+			(player_tile_pos.x - camera_pos.x) * 8 + PPU466::ScreenWidth / 2,
+			(player_tile_pos.y - camera_pos.y) * 8 + PPU466::ScreenHeight / 2
+	);
+
+	auto sprites = SpriteIndices::player[last_pressed][pose];
+	auto x_offsets = std::array<float, 4> {8.0f, 0.0f, 8.0f, 0.0f};
+	auto y_offsets = std::array<float, 4> {8.0f, 8.0f, 0.0f, 0.0f};
+	for (int i = 0; i < 4; i++) {
+		ppu.sprites[i+40].x = int32_t(player_pos.x - x_offsets[i]);
+		ppu.sprites[i+40].y = int32_t(player_pos.y - y_offsets[i]);
+		ppu.sprites[i+40].index = sprites[i];
+		ppu.sprites[i+40].attributes = 7;
+	}
+}
+
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
 	//--- set ppu state based on game state ---
@@ -319,29 +366,10 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			(player_tile_pos.x - camera_pos.x) * 8 + PPU466::ScreenWidth / 2,
 			(player_tile_pos.y - camera_pos.y) * 8 + PPU466::ScreenHeight / 2
 	);
-	
-	ppu.sprites[0].x = int32_t(player_pos.x - 8.0f);
-	ppu.sprites[0].y = int32_t(player_pos.y - 8.0f);
-	ppu.sprites[0].index = 3;
-	ppu.sprites[0].attributes = 7;
-	ppu.sprites[1].x = int32_t(player_pos.x - 8.0f);
-	ppu.sprites[1].y = int32_t(player_pos.y);
-	ppu.sprites[1].index = 3;
-	ppu.sprites[1].attributes = 7;
-	ppu.sprites[2].x = int32_t(player_pos.x);
-	ppu.sprites[2].y = int32_t(player_pos.y - 8.0f);
-	ppu.sprites[2].index = 3;
-	ppu.sprites[2].attributes = 7;
-	ppu.sprites[3].x = int32_t(player_pos.x);
-	ppu.sprites[3].y = int32_t(player_pos.y);
-	ppu.sprites[3].index = 3;
-	ppu.sprites[3].attributes = 7;
 
-	glm::ivec2 mouse_raw;
-	SDL_GetMouseState(&(mouse_raw.x), &(mouse_raw.y));
-	glm::vec2 mouse = screen_to_ppu * glm::vec3(mouse_raw, 1.0f);
+	draw_player();
 
-	flashlight.update_lightmap((player_pos - glm::vec2(ppu.background_position)), mouse - glm::vec2(ppu.background_position), lower_left, map_tiles, map_width, map_height);
+	flashlight.update_lightmap((player_pos - glm::vec2(ppu.background_position)), lower_left, map_tiles, map_width, map_height);
 	std::array<uint8_t, Flashlight::lightmap_width * Flashlight::lightmap_height / 64> newmap;
 	std::vector<PPU466::Tile> dyntiles;
 	flashlight.graft(lower_left, map_tiles, map_width, map_height, ppu.tile_table, newmap, dyntiles);
@@ -354,6 +382,44 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
 	for (size_t i = 0; i < dyntiles.size(); i++) {
 		ppu.tile_table[i + Flashlight::DYNAMIC_TILE_START] = dyntiles[i];
+	}
+
+	for (size_t i = 0; i < coins.size(); i++) {
+		glm::vec2 coin_pos = glm::vec2(
+			(coins[i].x - camera_pos.x) * 8 + PPU466::ScreenWidth / 2,
+			(coins[i].y - camera_pos.y) * 8 + PPU466::ScreenHeight / 2
+		);
+
+		if (coin_pos.x < 0 || coin_pos.x >= PPU466::ScreenWidth) {
+			ppu.sprites[i].y = 248;
+			continue;
+		}
+		if (coin_pos.y < 0 || coin_pos.y >= PPU466::ScreenHeight) {
+			ppu.sprites[i].y = 248;
+			continue;
+		}
+
+
+		PPU466::Tile t = ppu.tile_table[SpriteIndices::coin];
+		
+		glm::vec2 lower_left = coin_pos - glm::vec2(ppu.background_position);
+		for (int y = 0; y < 8; y++) {
+			uint8_t row = 0;
+			for (int x = 7; x >= 0; x--) {
+				bool light = flashlight.lightmap[(int)(lower_left.y + y) * Flashlight::lightmap_width + (int)(lower_left.x + x)];
+				row <<= 1;
+				if (light) row += 1;
+			}
+			t.bit0[y] &= row;
+			t.bit1[y] &= row;
+		}
+
+		ppu.tile_table[64 + i] = t;
+
+		ppu.sprites[i].attributes = 1;
+		ppu.sprites[i].index = 64 + i;
+		ppu.sprites[i].x = coin_pos.x;
+		ppu.sprites[i].y = coin_pos.y;
 	}
 
 
